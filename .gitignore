@@ -1,0 +1,33 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+storage/aums_session.json
+assignment_files/*
+!assignment_files/.gitkeep
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# AUMS authentication session
+storage/aums_session.json
+
+# Downloaded assignment files
+assignment_files/*
+!assignment_files/.gitkeep
+
+# macOS
+.DS_Store
+
+# Playwright
+playwright/.cache/
+
+# IDE
+.vscode/
+.idea/

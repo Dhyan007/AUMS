@@ -1,0 +1,138 @@
+jump to content [c]
+ Tools [l]  Assignments
+Sites list begins here
+Home
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..Com.Re.PHY. ...
+Int M.Sc..Com.Re.DS.7 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+Int M.Sc..2023.R.DS.1 ...
+ASSIGNMENTS
+Content begins here
+Link
+Help
+Opens in a new window
+Assignment - In progress
+
+Complete the form, then choose the appropriate button at the bottom.
+
+Draft - In progress
+Submitted
+Returned
+Title
+Assignment 21: Using Pig
+Due
+Oct 10, 2026 11:55 PM
+Number of resubmissions allowed
+3
+Accept Resubmission Until
+Oct 10, 2026 11:55 PM
+Status
+Not Started
+Grade Scale
+No Grade
+Modified by instructor
+Sep 23, 2026 11:09 AM
+Instructions
+
+Do the following Tasks on given employee .tsv and Department.tsv file
+
+1. Sample
+
+2. Average
+
+3. Max
+
+4. count
+
+5. join
+
+6. union
+
+Additional resources for assignment
+ employee.xlsx ( 8 KB; Sep 23, 2026 11:06 am )
+ department.csv ( 1 KB; Sep 23, 2026 11:06 am )
+Submission
+Assignment Text
+
+This assignment allows submissions using both the text box below and attached documents. Type your submission in the box below and/or use the Browse button or the "select files" button to include other documents. Save frequently while working.
+
+ 
+ 
+Source
+ 
+Templates
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Styles
+Format
+Font
+Size
+ 
+ 
+ 
+ 
+◢
+ 
+Words: 0, Characters (with HTML): 0/1000000
+Attachments
+
+No attachments yet
+
+Select a file from computer	
+	
+			
+Don't forget to save or submit!
+Users present begins here
+Toggle users present panel
+Number of users present:
+#
