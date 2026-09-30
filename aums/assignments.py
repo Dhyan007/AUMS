@@ -1,7 +1,12 @@
+# aums/assignments.py
+
+import os
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, unquote
+
 from utils.console import print_separator
 from utils.urls import make_absolute_url
+
 
 def normalize_text(text):
     if not text:
@@ -10,15 +15,178 @@ def normalize_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
+# ADD THIS FUNCTION TO aums/assignments.py
+# Place it before extract_assignment_details()
 
+def inspect_assignment_page(page, assignment_url):
+    print_separator()
+
+    print("📄 OPENING INDIVIDUAL ASSIGNMENT")
+    print("\nURL:")
+    print(assignment_url)
+
+    page.goto(
+        assignment_url,
+        wait_until="domcontentloaded"
+    )
+
+    page.wait_for_timeout(3000)
+
+    print("\n✅ Assignment page loaded!")
+
+    print("\nCurrent URL:")
+    print(page.url)
+
+    # --------------------------------------------------------
+    # PAGE TEXT
+    # --------------------------------------------------------
+
+    print_separator()
+    print("📄 ASSIGNMENT PAGE CONTENT")
+    print_separator()
+
+    try:
+        body_text = page.locator(
+            "body"
+        ).inner_text()
+
+    except Exception as e:
+        print(
+            f"❌ Could not extract page text: {e}"
+        )
+        body_text = ""
+
+    print(body_text)
+
+    # --------------------------------------------------------
+    # SAVE PAGE TEXT
+    # --------------------------------------------------------
+
+    output_file = "assignment_21_content.txt"
+
+    try:
+        with open(
+            output_file,
+            "w",
+            encoding="utf-8"
+        ) as file:
+
+            file.write(body_text)
+
+        print_separator()
+
+        print("💾 Page text saved to:")
+        print(output_file)
+
+    except Exception as e:
+
+        print(
+            f"❌ Could not save page text: {e}"
+        )
+
+    # --------------------------------------------------------
+    # ATTACHMENTS
+    # --------------------------------------------------------
+
+    print_separator()
+    print("📎 ATTACHMENTS")
+    print_separator()
+
+    attachments = []
+
+    attachment_links = page.locator(
+        'a[href*="/access/content/attachment/"]'
+    )
+
+    attachment_count = attachment_links.count()
+
+    for i in range(attachment_count):
+
+        link = attachment_links.nth(i)
+
+        try:
+
+            text = normalize_text(
+                link.inner_text()
+            )
+
+        except Exception:
+            text = ""
+
+        try:
+
+            href = link.get_attribute(
+                "href"
+            )
+
+        except Exception:
+            href = None
+
+        if not href:
+            continue
+
+        absolute_url = make_absolute_url(
+            page.url,
+            href
+        )
+
+        filename = (
+            text.split("(")[0].strip()
+            if text
+            else absolute_url.rstrip("/").split("/")[-1]
+        )
+
+        attachment = {
+            "name": filename,
+            "filename": filename,
+            "url": absolute_url
+        }
+
+        if not any(
+            existing["url"] == absolute_url
+            for existing in attachments
+        ):
+            attachments.append(
+                attachment
+            )
+
+    if attachments:
+
+        print(
+            f"\nFound {len(attachments)} attachment(s).\n"
+        )
+
+        for i, attachment in enumerate(
+            attachments,
+            1
+        ):
+
+            print(
+                f"{i}. {attachment['filename']}"
+            )
+
+            print(
+                f"   URL: {attachment['url']}"
+            )
+
+    else:
+
+        print(
+            "\n❌ No assignment attachments detected."
+        )
+
+    # --------------------------------------------------------
+    # RETURN DATA
+    # --------------------------------------------------------
+
+    return {
+        "url": page.url,
+        "text": body_text,
+        "attachments": attachments
+    }
 def extract_assignment_metadata(page, assignment):
-
     title = assignment["title"]
     href = assignment["href"]
-
-    # --------------------------------------------------------
-    # Try to find parent row
-    # --------------------------------------------------------
 
     locator = page.locator(
         f'a[href="{href}"]'
@@ -29,12 +197,10 @@ def extract_assignment_metadata(page, assignment):
     due_date = ""
 
     try:
-
         if locator.count() > 0:
 
             element = locator.first
 
-            # Find nearest row
             row = element.locator(
                 "xpath=ancestor::tr[1]"
             )
@@ -45,7 +211,6 @@ def extract_assignment_metadata(page, assignment):
                     row.inner_text()
                 )
 
-                # Status
                 status_match = re.search(
                     r"(Not Started|Submitted[^|]*|In Progress|Returned[^|]*)",
                     row_text,
@@ -55,16 +220,6 @@ def extract_assignment_metadata(page, assignment):
                 if status_match:
                     status = status_match.group(1).strip()
 
-                # Dates
-                dates = re.findall(
-                    r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
-                    r"\s+\d{1,2},\s+\d{4}"
-                    r"(?:\s+\d{1,2}:\d{2}\s+[AP]M)?",
-                    row_text,
-                    re.IGNORECASE
-                )
-
-                # Better generic date extraction
                 date_matches = re.findall(
                     r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
                     r"\s+\d{1,2},\s+\d{4}"
@@ -94,17 +249,9 @@ def extract_assignment_metadata(page, assignment):
 def extract_assignments(page):
 
     print_separator()
-
     print("🔍 Extracting assignments...")
 
-    body_text = page.locator("body").inner_text()
-
-    # --------------------------------------------------------
-    # Try to identify assignment links
-    # --------------------------------------------------------
-
     links = page.locator("a")
-
     link_count = links.count()
 
     assignments = []
@@ -123,13 +270,9 @@ def extract_assignments(page):
         except Exception:
             href = None
 
-        if not text:
+        if not text or not href:
             continue
 
-        if not href:
-            continue
-
-        # Assignment titles normally contain "Assignment"
         if re.search(
             r"Assignment\s+\d+",
             text,
@@ -141,9 +284,7 @@ def extract_assignments(page):
                 "href": href
             })
 
-    # Remove duplicates
     unique = []
-
     seen = set()
 
     for assignment in assignments:
@@ -179,7 +320,6 @@ def find_target_assignment(page, target_title):
     if not assignments:
 
         print("❌ No assignments found.")
-
         return None
 
     target = None
@@ -199,7 +339,6 @@ def find_target_assignment(page, target_title):
             target = assignment
             break
 
-    # If exact match fails, try partial match
     if target is None:
 
         for assignment in assignments:
@@ -262,17 +401,60 @@ def find_target_assignment(page, target_title):
     return metadata
 
 
-def inspect_assignment_page(
+def _extract_filename(link):
+
+    text = normalize_text(
+        link.inner_text()
+    )
+
+    href = link.get_attribute("href") or ""
+
+    if text:
+        filename = text.split("(")[0].strip()
+    else:
+        filename = ""
+
+    if not filename:
+        filename = unquote(
+            href.rstrip("/").split("/")[-1]
+        )
+
+    filename = os.path.basename(filename)
+
+    return filename
+
+
+def _is_assignment_attachment(href):
+
+    if not href:
+        return False
+
+    href_lower = href.lower()
+
+    return (
+        "/access/content/attachment/"
+        in href_lower
+    )
+
+
+def extract_assignment_details(
     page,
-    assignment_url
+    assignment_url,
+    download_dir="assignment_files"
 ):
 
-    print_separator()
+    print("\n" + "=" * 70)
+    print("📚 EXTRACTING ASSIGNMENT DETAILS")
+    print("=" * 70)
 
-    print("📄 OPENING INDIVIDUAL ASSIGNMENT")
+    os.makedirs(
+        download_dir,
+        exist_ok=True
+    )
 
-    print("\nURL:")
-    print(assignment_url)
+    # ---------------------------------------------------------
+    # OPEN ASSIGNMENT
+    # ---------------------------------------------------------
 
     page.goto(
         assignment_url,
@@ -281,20 +463,12 @@ def inspect_assignment_page(
 
     page.wait_for_timeout(3000)
 
-    print("\n✅ Assignment page loaded!")
-
     print("\nCurrent URL:")
     print(page.url)
 
-    # ========================================================
-    # PAGE TEXT
-    # ========================================================
-
-    print_separator()
-
-    print("📄 ASSIGNMENT PAGE CONTENT")
-
-    print_separator()
+    # ---------------------------------------------------------
+    # FULL PAGE TEXT
+    # ---------------------------------------------------------
 
     try:
 
@@ -305,261 +479,10 @@ def inspect_assignment_page(
     except Exception as e:
 
         print(
-            "❌ Could not extract page text:"
+            f"❌ Could not extract page text: {e}"
         )
-
-        print(e)
 
         body_text = ""
-
-    print(body_text)
-
-    # ========================================================
-    # SAVE PAGE TEXT
-    # ========================================================
-
-    output_file = "assignment_21_content.txt"
-
-    try:
-
-        with open(
-            output_file,
-            "w",
-            encoding="utf-8"
-        ) as file:
-
-            file.write(body_text)
-
-        print_separator()
-
-        print("💾 Page text saved to:")
-        print(output_file)
-
-    except Exception as e:
-
-        print(
-            f"❌ Could not save page text: {e}"
-        )
-
-    # ========================================================
-    # ATTACHMENTS
-    # ========================================================
-
-    print_separator()
-
-    print("📎 ATTACHMENTS")
-
-    print_separator()
-
-    attachments = []
-
-    links = page.locator("a")
-
-    link_count = links.count()
-
-    for i in range(link_count):
-
-        link = links.nth(i)
-
-        try:
-            text = normalize_text(
-                link.inner_text()
-            )
-        except Exception:
-            text = ""
-
-        try:
-            href = link.get_attribute(
-                "href"
-            )
-        except Exception:
-            href = None
-
-        if not href:
-            continue
-
-        combined = (
-            text + " " + href
-        ).lower()
-
-        attachment_keywords = [
-            "attachment",
-            "download",
-            ".pdf",
-            ".txt",
-            ".doc",
-            ".docx",
-            ".xls",
-            ".xlsx",
-            ".csv",
-            ".zip",
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".java",
-            ".py",
-            ".c",
-            ".cpp"
-        ]
-
-        if any(
-            keyword in combined
-            for keyword in attachment_keywords
-        ):
-
-            absolute_url = make_absolute_url(
-                page.url,
-                href
-            )
-
-            attachment = {
-                "name": (
-                    text
-                    if text
-                    else "Unnamed attachment"
-                ),
-                "url": absolute_url
-            }
-
-            duplicate = False
-
-            for existing in attachments:
-
-                if (
-                    existing["url"]
-                    ==
-                    attachment["url"]
-                ):
-
-                    duplicate = True
-                    break
-
-            if not duplicate:
-
-                attachments.append(
-                    attachment
-                )
-
-    if attachments:
-
-        print(
-            f"\nFound {len(attachments)} "
-            "possible attachment(s).\n"
-        )
-
-        for i, attachment in enumerate(
-            attachments,
-            1
-        ):
-
-            print(
-                f"{i}. {attachment['name']}"
-            )
-
-            print(
-                f"   URL: {attachment['url']}"
-            )
-
-    else:
-
-        print(
-            "\n❌ No obvious attachments "
-            "detected."
-        )
-
-    # ========================================================
-    # ALL LINKS
-    # ========================================================
-
-    print_separator()
-
-    print("🔗 ALL LINKS ON ASSIGNMENT PAGE")
-
-    print_separator()
-
-    for i in range(link_count):
-
-        link = links.nth(i)
-
-        try:
-            text = normalize_text(
-                link.inner_text()
-            )
-        except Exception:
-            text = ""
-
-        try:
-            href = link.get_attribute(
-                "href"
-            )
-        except Exception:
-            href = None
-
-        if not href:
-            continue
-
-        absolute_url = make_absolute_url(
-            page.url,
-            href
-        )
-
-        print(f"\n{i}. {text}")
-
-        print(
-            f"   {absolute_url}"
-        )
-
-    # ========================================================
-    # FRAME INFORMATION
-    # ========================================================
-
-    print_separator()
-
-    print("🖼️ FRAMES ON ASSIGNMENT PAGE")
-
-    print_separator()
-
-    for i, frame in enumerate(
-        page.frames
-    ):
-
-        try:
-
-            print(
-                f"\nFRAME {i}"
-            )
-
-            print(
-                frame.url
-            )
-
-        except Exception:
-            pass
-
-    # ========================================================
-    # RETURN DATA
-    # ========================================================
-
-    return {
-        "url": page.url,
-        "text": body_text,
-        "attachments": attachments
-    }
-
-
-def extract_assignment_details(page, assignment_url, download_dir="assignment_files"):
-
-    print("\n" + "=" * 70)
-    print("📚 EXTRACTING ASSIGNMENT DETAILS")
-    print("=" * 70)
-
-    os.makedirs(download_dir, exist_ok=True)
-
-    # ---------------------------------------------------------
-    # FULL PAGE TEXT
-    # ---------------------------------------------------------
-
-    body_text = page.locator("body").inner_text()
 
     lines = [
         line.strip()
@@ -575,7 +498,12 @@ def extract_assignment_details(page, assignment_url, download_dir="assignment_fi
 
     for line in lines:
 
-        if line.startswith("Assignment ") and ":" in line:
+        if re.match(
+            r"^Assignment\s+\d+",
+            line,
+            re.IGNORECASE
+        ):
+
             title = line
             break
 
@@ -585,25 +513,41 @@ def extract_assignment_details(page, assignment_url, download_dir="assignment_fi
 
     instructions = ""
 
+    instruction_start = None
+
     for i, line in enumerate(lines):
 
         if line.lower() == "instructions":
 
-            instruction_lines = []
-
-            for next_line in lines[i + 1:]:
-
-                if next_line.lower() == "submission":
-                    break
-
-                if next_line.lower() == "source":
-                    break
-
-                instruction_lines.append(next_line)
-
-            instructions = "\n".join(instruction_lines)
-
+            instruction_start = i + 1
             break
+
+    if instruction_start is not None:
+
+        instruction_lines = []
+
+        stop_sections = {
+            "submission",
+            "source",
+            "additional resources",
+            "additional resources for assignment",
+            "attachments",
+            "attachment",
+            "rubric"
+        }
+
+        for line in lines[instruction_start:]:
+
+            normalized_line = line.lower().strip()
+
+            if normalized_line in stop_sections:
+                break
+
+            instruction_lines.append(line)
+
+        instructions = "\n".join(
+            instruction_lines
+        ).strip()
 
     # ---------------------------------------------------------
     # TASKS
@@ -613,10 +557,17 @@ def extract_assignment_details(page, assignment_url, download_dir="assignment_fi
 
     for line in instructions.splitlines():
 
-        match = re.match(r"^(\d+)\.\s*(.*)", line)
+        match = re.match(
+            r"^(\d+)\.\s*(.*)",
+            line
+        )
 
         if match:
-            tasks.append(match.group(2).strip())
+
+            task = match.group(2).strip()
+
+            if task:
+                tasks.append(task)
 
     # ---------------------------------------------------------
     # ATTACHMENTS
@@ -628,9 +579,16 @@ def extract_assignment_details(page, assignment_url, download_dir="assignment_fi
         'a[href*="/access/content/attachment/"]'
     )
 
-    attachment_count = attachment_links.count()
+    attachment_count = (
+        attachment_links.count()
+    )
 
-    print(f"\n📎 Attachment links found: {attachment_count}")
+    print(
+        f"\n📎 Assignment attachment links found: "
+        f"{attachment_count}"
+    )
+
+    seen_urls = set()
 
     for i in range(attachment_count):
 
@@ -638,62 +596,115 @@ def extract_assignment_details(page, assignment_url, download_dir="assignment_fi
 
         try:
 
-            filename = link.inner_text().strip()
-
-            href = link.get_attribute("href")
+            href = link.get_attribute(
+                "href"
+            )
 
             if not href:
                 continue
 
-            href = urljoin(assignment_url, href)
+            absolute_url = urljoin(
+                assignment_url,
+                href
+            )
 
-            # Remove extra text
-            filename = filename.split("(")[0].strip()
+            if absolute_url in seen_urls:
+                continue
+
+            seen_urls.add(
+                absolute_url
+            )
+
+            filename = _extract_filename(
+                link
+            )
 
             if not filename:
-                filename = href.split("/")[-1]
+                filename = (
+                    absolute_url
+                    .rstrip("/")
+                    .split("/")[-1]
+                )
 
             attachments.append({
                 "filename": filename,
-                "url": href
+                "url": absolute_url
             })
 
         except Exception as e:
 
             print(
-                f"⚠️ Could not process attachment {i}: {e}"
+                f"⚠️ Could not process "
+                f"attachment {i}: {e}"
             )
 
     # ---------------------------------------------------------
     # DISPLAY
     # ---------------------------------------------------------
 
-    print("\n" + "=" * 70)
+    print_separator()
+
     print("📋 ASSIGNMENT")
-    print("=" * 70)
+
+    print_separator()
 
     print("\nTitle:")
-    print(title)
+    print(
+        title if title else "Unknown"
+    )
 
     print("\nInstructions:")
-    print(instructions)
+    print(
+        instructions
+        if instructions
+        else "No instructions found."
+    )
 
     print("\nTasks:")
 
-    for i, task in enumerate(tasks, 1):
-        print(f"{i}. {task}")
+    if tasks:
+
+        for i, task in enumerate(
+            tasks,
+            1
+        ):
+
+            print(
+                f"{i}. {task}"
+            )
+
+    else:
+
+        print(
+            "No numbered tasks detected."
+        )
 
     print("\nAttachments:")
 
-    for i, attachment in enumerate(attachments, 1):
+    if attachments:
+
+        for i, attachment in enumerate(
+            attachments,
+            1
+        ):
+
+            print(
+                f"{i}. {attachment['filename']}"
+            )
+
+            print(
+                f"   {attachment['url']}"
+            )
+
+    else:
 
         print(
-            f"{i}. {attachment['filename']}"
+            "No assignment attachments found."
         )
 
-        print(
-            f"   {attachment['url']}"
-        )
+    # ---------------------------------------------------------
+    # RETURN STRUCTURED DATA
+    # ---------------------------------------------------------
 
     return {
         "title": title,

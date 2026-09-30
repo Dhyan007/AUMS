@@ -1,26 +1,46 @@
+# aums/attachments.py
+
 import os
-import re
-from pathlib import Path
+from urllib.parse import urlparse
+
 import requests
+
 from utils.console import print_separator
 
-def download_assignment_files(assignment, download_dir="assignment_files"):
-    """
-    Download unique assignment attachments.
 
-    Uses the attachment information already extracted from
-    the authenticated AUMS page.
-    """
+def _safe_filename(filename):
+
+    filename = os.path.basename(
+        filename.strip()
+    )
+
+    if not filename:
+        return None
+
+    return filename
+
+
+def download_assignment_files(
+    assignment,
+    download_dir="assignment_files"
+):
 
     print_separator()
     print("📥 DOWNLOADING ASSIGNMENT FILES")
     print_separator()
 
-    os.makedirs(download_dir, exist_ok=True)
+    os.makedirs(
+        download_dir,
+        exist_ok=True
+    )
 
-    attachments = assignment.get("attachments", [])
+    attachments = assignment.get(
+        "attachments",
+        []
+    )
 
     downloaded_files = []
+
     seen_urls = set()
     seen_filenames = set()
 
@@ -36,13 +56,18 @@ def download_assignment_files(assignment, download_dir="assignment_files"):
         if not filename or not url:
             continue
 
-        # Avoid duplicate attachment entries
+        filename = _safe_filename(
+            filename
+        )
+
+        if not filename:
+            continue
+
         if url in seen_urls:
             continue
 
         seen_urls.add(url)
 
-        # Avoid overwriting the same filename repeatedly
         if filename in seen_filenames:
             continue
 
@@ -55,6 +80,10 @@ def download_assignment_files(assignment, download_dir="assignment_files"):
 
         try:
 
+            print(
+                f"⬇️ Downloading: {filename}"
+            )
+
             response = requests.get(
                 url,
                 timeout=30
@@ -62,22 +91,35 @@ def download_assignment_files(assignment, download_dir="assignment_files"):
 
             response.raise_for_status()
 
-            with open(filepath, "wb") as f:
-                f.write(response.content)
+            with open(
+                filepath,
+                "wb"
+            ) as file:
 
-            downloaded_files.append(filepath)
+                file.write(
+                    response.content
+                )
 
-            print(f"✓ {filename}")
+            downloaded_files.append(
+                filepath
+            )
+
+            print(
+                f"✓ Saved: {filepath}"
+            )
 
         except Exception as e:
 
             print(
-                f"❌ Failed to download {filename}: {e}"
+                f"❌ Failed to download "
+                f"{filename}: {e}"
             )
 
     print()
+
     print(
-        f"✅ DOWNLOADED {len(downloaded_files)} UNIQUE FILES"
+        f"✅ DOWNLOADED "
+        f"{len(downloaded_files)} UNIQUE FILES"
     )
 
     print_separator()
