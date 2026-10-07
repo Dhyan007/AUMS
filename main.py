@@ -1,4 +1,6 @@
 from datetime import datetime
+import os
+import re
 from config import (
     DOWNLOAD_DIR,
     SESSION_FILE,
@@ -24,17 +26,237 @@ from aums.courses import (
 from aums.assignments import (
     extract_assignments,
     extract_assignment_metadata,
+    inspect_assignment_page,
 )
+
 
 from aums.attachments import download_assignment_files
 
 from utils.console import print_heading
 from utils.urls import make_absolute_url
 
+def process_pending_assignments(
+    page,
+    pending_assignments
+):
 
+    print_heading(
+        "📥 PROCESSING PENDING ASSIGNMENTS"
+    )
+
+    total_downloaded = 0
+
+    for index, assignment in enumerate(
+        pending_assignments,
+        1
+    ):
+
+        course = assignment.get(
+            "course",
+            "Unknown Course"
+        )
+
+        title = assignment.get(
+            "title",
+            "Unknown Assignment"
+        )
+
+        assignment_url = assignment.get(
+            "url"
+        )
+
+        print("\n" + "=" * 70)
+
+        print(
+            f"📚 Course: {course}"
+        )
+
+        print(
+            f"📝 Assignment {index}/"
+            f"{len(pending_assignments)}: {title}"
+        )
+
+        print(
+            f"🔗 URL: {assignment_url}"
+        )
+
+        print("=" * 70)
+
+        if not assignment_url:
+
+            print(
+                "❌ Assignment URL not found."
+            )
+
+            continue
+
+        try:
+
+            # =================================================
+            # CREATE ASSIGNMENT-SPECIFIC FOLDER
+            # =================================================
+
+            safe_course = re.sub(
+                r'[\\/:*?"<>|]',
+                "_",
+                course
+            ).strip()
+
+            safe_title = re.sub(
+                r'[\\/:*?"<>|]',
+                "_",
+                title
+            ).strip()
+
+            assignment_dir = os.path.join(
+                DOWNLOAD_DIR,
+                safe_course,
+                safe_title
+            )
+
+            os.makedirs(
+                assignment_dir,
+                exist_ok=True
+            )
+
+            print(
+                f"\n📁 Assignment folder:"
+            )
+
+            print(
+                f"   {assignment_dir}"
+            )
+
+            # =================================================
+            # OPEN / EXTRACT ASSIGNMENT
+            # =================================================
+
+            print(
+                "\n🔍 Opening assignment..."
+            )
+
+            assignment_data = (
+                inspect_assignment_page(
+                    page,
+                    assignment_url
+                )
+            )
+
+            # =================================================
+            # SAVE ASSIGNMENT TEXT
+            # =================================================
+
+            assignment_text = (
+                assignment_data.get(
+                    "text",
+                    ""
+                )
+            )
+
+            text_file = os.path.join(
+                assignment_dir,
+                "assignment.txt"
+            )
+
+            with open(
+                text_file,
+                "w",
+                encoding="utf-8"
+            ) as f:
+
+                f.write(
+                    assignment_text
+                )
+
+            print(
+                "\n💾 Assignment text saved:"
+            )
+
+            print(
+                f"   {text_file}"
+            )
+
+            # =================================================
+            # DOWNLOAD FILES
+            # =================================================
+
+            print_heading(
+                "📥 DOWNLOADING ASSIGNMENT FILES"
+            )
+
+            downloaded_files = (
+                download_assignment_files(
+                    assignment_data,
+                    assignment_dir
+                )
+            )
+
+            total_downloaded += len(
+                downloaded_files
+            )
+
+            # =================================================
+            # RESULT
+            # =================================================
+
+            print(
+                f"\n✅ Assignment processed: "
+                f"{title}"
+            )
+
+            if downloaded_files:
+
+                print(
+                    "\n📎 Downloaded files:"
+                )
+
+                for file_path in downloaded_files:
+
+                    print(
+                        f"   ✓ {file_path}"
+                    )
+
+            else:
+
+                print(
+                    "\n📎 No files downloaded."
+                )
+
+        except Exception as e:
+
+            print(
+                f"\n❌ Failed to process "
+                f"{title}"
+            )
+
+            print(
+                f"   Error: {e}"
+            )
+
+    # =================================================
+    # FINAL DOWNLOAD SUMMARY
+    # =================================================
+
+    print("\n" + "=" * 70)
+    print("📊 DOWNLOAD SUMMARY")
+    print("=" * 70)
+
+    print(
+        f"Pending assignments: "
+        f"{len(pending_assignments)}"
+    )
+
+    print(
+        f"Files downloaded: "
+        f"{total_downloaded}"
+    )
+
+    print("=" * 70)
 def run():
 
-    print_heading("📚 AUMS ASSIGNMENT MAKER")
+    print_heading(
+        "📚 AUMS ASSIGNMENT MAKER"
+    )
 
     # ----------------------------------------------------
     # Start browser
@@ -81,7 +303,7 @@ def run():
         # ------------------------------------------------
         # Saved session invalid / login required
         # ------------------------------------------------
-        
+
         if portal_frame is None:
 
             print(
@@ -135,7 +357,8 @@ def run():
         print(
             "\n✅ AUMS portal frame found!"
         )
-                # =================================================
+
+        # =================================================
         # ALL COURSES → ALL PENDING ASSIGNMENTS
         # =================================================
 
@@ -156,7 +379,9 @@ def run():
 
         if not pending_assignments:
 
-            print("\n✅ No pending assignments found.")
+            print(
+                "\n✅ No pending assignments found."
+            )
 
         else:
 
@@ -206,274 +431,29 @@ def run():
 
             print("=" * 70)
 
-        input(
-            "\nPress ENTER to close the browser..."
-        )
         # =================================================
-        # COURSE
+        # PROCESS / DOWNLOAD ALL PENDING ASSIGNMENTS
         # =================================================
 
-        print(
-            "\n🔍 Looking for course:"
-        )
+        if pending_assignments:
 
-        print(
-            TARGET_COURSE
-        )
-
-        course = find_course(
-            portal_frame,
-            TARGET_COURSE
-        )
-
-        if course is None:
-
-            print(
-                "\n❌ Target course not found."
+            process_pending_assignments(
+                page,
+                pending_assignments
             )
-
-            return
-
-        # ------------------------------------------------
-        # Open course
-        # ------------------------------------------------
-
-        print(
-            "\n🖱️ Opening course..."
-        )
-
-        course_url = make_absolute_url(
-            portal_frame.url,
-            course["href"]
-        )
-
-        print(
-            "\nCourse URL:"
-        )
-
-        print(
-            course_url
-        )
-
-        page.goto(
-            course_url,
-            wait_until="domcontentloaded"
-        )
-
-        page.wait_for_timeout(2500)
-
-        # ------------------------------------------------
-        # Find course frame
-        # ------------------------------------------------
-
-        course_frame = find_course_frame(
-            page,
-            course["href"]
-        )
-
-        if course_frame is None:
-
-            print(
-                "\n❌ Course frame not found."
-            )
-
-            return
-
-        print(
-            "\n✅ Course frame found!"
-        )
-
-        print(
-            "\nCourse frame URL:"
-        )
-
-        print(
-            course_frame.url
-        )
-
-        # =================================================
-        # ASSIGNMENTS
-        # =================================================
-
-        assignments_href = find_assignments_link(
-            course_frame
-        )
-
-        if not assignments_href:
-
-            print(
-                "\n❌ Assignments link not found."
-            )
-
-            return
-
-        assignments_url = make_absolute_url(
-            course_frame.url,
-            assignments_href
-        )
-
-        print(
-            "\n🖱️ Opening Assignments directly..."
-        )
-
-        print(
-            "\nAssignments URL:"
-        )
-
-        print(
-            assignments_url
-        )
-
-        page.goto(
-            assignments_url,
-            wait_until="domcontentloaded"
-        )
-
-        page.wait_for_timeout(2500)
-
-        print(
-            "\n✅ Assignments page opened!"
-        )
-
-        # =================================================
-        # FIND TARGET ASSIGNMENT
-        # =================================================
-
-        print(
-            "\n🔍 Looking for assignment:"
-        )
-
-        print(
-            TARGET_ASSIGNMENT
-        )
-
-        target_assignment = find_target_assignment(
-            page,
-            TARGET_ASSIGNMENT
-        )
-
-        if target_assignment is None:
-
-            print(
-                "\n❌ Target assignment not found."
-            )
-
-            return
-
-        print(
-            "\n✅ Assignment found!"
-        )
-
-        # =================================================
-        # OPEN ASSIGNMENT
-        # =================================================
-
-        assignment_url = make_absolute_url(
-            page.url,
-            target_assignment["url"]
-        )
-
-        print(
-            "\n🖱️ Opening assignment..."
-        )
-
-        print(
-            "\nAssignment URL:"
-        )
-
-        print(
-            assignment_url
-        )
-
-        # =================================================
-        # EXTRACT ASSIGNMENT
-        # =================================================
-
-        assignment_data = inspect_assignment_page(
-            page,
-            assignment_url
-        )
-
-        # =================================================
-        # DOWNLOAD FILES
-        # =================================================
-
-        print_heading(
-            "📥 DOWNLOADING ASSIGNMENT FILES"
-        )
-
-        downloaded_files = (
-            download_assignment_files(
-                assignment_data,
-                DOWNLOAD_DIR
-            )
-        )
-
-        # =================================================
-        # FINAL SUMMARY
-        # =================================================
-
-        print_heading(
-            "✅ ASSIGNMENT EXTRACTION COMPLETE"
-        )
-
-        print(
-            "Title:",
-            target_assignment.get(
-                "title",
-                "Unknown"
-            )
-        )
-
-        print(
-            "Status:",
-            target_assignment.get(
-                "status",
-                "Unknown"
-            )
-        )
-
-        print(
-            "Open:",
-            target_assignment.get(
-                "open",
-                "Unknown"
-            )
-        )
-
-        print(
-            "Due:",
-            target_assignment.get(
-                "due",
-                "Unknown"
-            )
-        )
-
-        # =================================================
-        # DOWNLOADED FILES
-        # =================================================
-
-        print(
-            "\n📎 DOWNLOADED FILES:"
-        )
-
-        if downloaded_files:
-
-            for file_path in downloaded_files:
-
-                print(
-                    "   ✓",
-                    file_path
-                )
 
         else:
 
             print(
-                "   No files downloaded."
+                "\n⏭️ Nothing to download."
             )
 
+        # =================================================
+        # FINAL
+        # =================================================
+
         print_heading(
-            "🎉 DONE"
+            "🎉 ALL COURSES PROCESSED"
         )
 
         input(
@@ -487,14 +467,19 @@ def run():
             browser
         )
 
+
+
 def collect_all_pending_assignments(page, portal_frame):
+
     print("\n" + "=" * 70)
     print("📚 SCANNING ALL COURSES")
     print("=" * 70)
 
     courses = find_course_links(portal_frame)
 
-    print(f"\n📚 Courses found: {len(courses)}")
+    print(
+        f"\n📚 Courses found: {len(courses)}"
+    )
 
     all_pending = []
 
@@ -503,25 +488,37 @@ def collect_all_pending_assignments(page, portal_frame):
         course_title = course["title"]
 
         print("\n" + "-" * 70)
-        print(f"📖 COURSE {index}/{len(courses)}")
+        print(
+            f"📖 COURSE {index}/{len(courses)}"
+        )
         print(course_title)
         print("-" * 70)
 
         try:
+
+            # =================================================
+            # OPEN COURSE
+            # =================================================
 
             course_url = make_absolute_url(
                 portal_frame.url,
                 course["href"]
             )
 
-            print(f"🌐 Opening course...")
+            print(
+                "🌐 Opening course..."
+            )
 
             page.goto(
                 course_url,
                 wait_until="domcontentloaded"
             )
 
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(3000)
+
+            # =================================================
+            # FIND COURSE FRAME
+            # =================================================
 
             course_frame = find_course_frame(
                 page,
@@ -529,15 +526,29 @@ def collect_all_pending_assignments(page, portal_frame):
             )
 
             if course_frame is None:
-                print("❌ Course frame not found.")
+
+                print(
+                    "❌ Course frame not found."
+                )
+
                 continue
 
-            assignments_href = find_assignments_link(
-                course_frame
+            # =================================================
+            # FIND ASSIGNMENTS LINK
+            # =================================================
+
+            assignments_href = (
+                find_assignments_link(
+                    course_frame
+                )
             )
 
             if not assignments_href:
-                print("⚠️ Assignments link not found.")
+
+                print(
+                    "⚠️ Assignments link not found."
+                )
+
                 continue
 
             assignments_url = make_absolute_url(
@@ -545,56 +556,194 @@ def collect_all_pending_assignments(page, portal_frame):
                 assignments_href
             )
 
-            print("📝 Opening assignments...")
+            print(
+                "📝 Opening assignments..."
+            )
+
+            print(
+                f"   URL: {assignments_url}"
+            )
+
+            # =================================================
+            # OPEN ASSIGNMENTS PAGE
+            # =================================================
 
             page.goto(
                 assignments_url,
                 wait_until="domcontentloaded"
             )
 
-            page.wait_for_timeout(2000)
-
-            assignments = extract_assignments(page)
+            # Give AUMS/Sakai time to render
+            page.wait_for_timeout(5000)
 
             print(
-                f"📋 Assignments found: "
+                "\nCurrent assignments URL:"
+            )
+
+            print(
+                page.url
+            )
+
+            # =================================================
+            # EXTRACT ASSIGNMENTS
+            # =================================================
+
+            assignments = []
+
+            # -------------------------------------------------
+            # First: search the main page
+            # -------------------------------------------------
+
+            try:
+
+                assignments = extract_assignments(
+                    page
+                )
+
+            except Exception as e:
+
+                print(
+                    f"⚠️ Main page extraction failed: {e}"
+                )
+
+            # -------------------------------------------------
+            # If nothing found, search every frame
+            # -------------------------------------------------
+
+            if not assignments:
+
+                print(
+                    "\n🔍 No assignments on main page."
+                )
+
+                print(
+                    "🔍 Checking AUMS frames..."
+                )
+
+                for frame in page.frames:
+
+                    try:
+
+                        frame_assignments = (
+                            extract_assignments(
+                                frame
+                            )
+                        )
+
+                        if frame_assignments:
+
+                            assignments = (
+                                frame_assignments
+                            )
+
+                            print(
+                                f"\n✅ Found assignments "
+                                f"in frame:"
+                            )
+
+                            print(
+                                frame.url
+                            )
+
+                            break
+
+                    except Exception:
+                        continue
+
+            print(
+                f"\n📋 Assignments found: "
                 f"{len(assignments)}"
             )
+
+            # =================================================
+            # NO ASSIGNMENTS
+            # =================================================
+
+            if not assignments:
+
+                print(
+                    "⏭️ No assignments found "
+                    f"for {course_title}"
+                )
+
+                continue
+
+            # =================================================
+            # CHECK EACH ASSIGNMENT
+            # =================================================
 
             course_pending = 0
 
             for assignment in assignments:
 
-                metadata = extract_assignment_metadata(
-                    page,
-                    assignment
-                )
+                try:
 
-                status = metadata.get(
-                    "status",
-                    ""
-                ).strip().lower()
-
-                # Pending means the student has not completed
-                # the assignment yet.
-                pending_statuses = (
-                    "not started",
-                    "in progress",
-                    "returned"
-                )
-
-                if any(
-                    status.startswith(s)
-                    for s in pending_statuses
-                ):
-
-                    metadata["course"] = course_title
-
-                    all_pending.append(
-                        metadata
+                    metadata = (
+                        extract_assignment_metadata(
+                            page,
+                            assignment
+                        )
                     )
 
-                    course_pending += 1
+                    status = (
+                        metadata
+                        .get("status", "")
+                        .strip()
+                        .lower()
+                    )
+
+                    # ------------------------------------------------
+                    # Pending statuses
+                    # ------------------------------------------------
+
+                    pending_statuses = (
+                        "not started",
+                        "in progress",
+                        "returned"
+                    )
+
+                    is_pending = any(
+                        status.startswith(
+                            pending_status
+                        )
+                        for pending_status
+                        in pending_statuses
+                    )
+
+                    if is_pending:
+
+                        metadata["course"] = (
+                            course_title
+                        )
+
+                        # Convert relative URL
+                        # into absolute URL
+                        metadata["url"] = (
+                            make_absolute_url(
+                                page.url,
+                                metadata["url"]
+                            )
+                        )
+
+                        all_pending.append(
+                            metadata
+                        )
+
+                        course_pending += 1
+
+                        print(
+                            f"   ⏳ {metadata['title']}"
+                            f" → {metadata['status']}"
+                        )
+
+                except Exception as e:
+
+                    print(
+                        f"⚠️ Could not process "
+                        f"assignment "
+                        f"{assignment.get('title', 'Unknown')}: "
+                        f"{e}"
+                    )
 
             print(
                 f"⏳ Pending assignments: "
@@ -610,6 +759,205 @@ def collect_all_pending_assignments(page, portal_frame):
 
             continue
 
+    # =================================================
+    # SORT BY DUE DATE
+    # =================================================
+
+    def parse_due_date(assignment):
+
+        due = assignment.get(
+            "due",
+            ""
+        )
+
+        if not due:
+            return datetime.max
+
+        formats = [
+            "%b %d, %Y %I:%M %p",
+            "%b %d, %Y",
+        ]
+
+        for fmt in formats:
+
+            try:
+
+                return datetime.strptime(
+                    due,
+                    fmt
+                )
+
+            except ValueError:
+                pass
+
+        return datetime.max
+
+    all_pending.sort(
+        key=parse_due_date
+    )
+
+    # =================================================
+    # FINAL SCAN SUMMARY
+    # =================================================
+
+    print("\n" + "=" * 70)
+    print("📊 COURSE SCAN COMPLETE")
+    print("=" * 70)
+
+    print(
+        f"Courses scanned: {len(courses)}"
+    )
+
+    print(
+        f"Pending assignments found: "
+        f"{len(all_pending)}"
+    )
+
+    print("=" * 70)
+
+    return all_pending
+def download_all_pending_assignments(
+    page,
+    pending_assignments
+):
+    print("\n" + "=" * 70)
+    print("📥 DOWNLOADING ALL PENDING ASSIGNMENTS")
+    print("=" * 70)
+
+    if not pending_assignments:
+        print("\n✅ Nothing to download.")
+        return
+
+    total_files = 0
+
+    for index, assignment in enumerate(
+        pending_assignments,
+        1
+    ):
+
+        course = assignment.get(
+            "course",
+            "Unknown Course"
+        )
+
+        title = assignment.get(
+            "title",
+            "Unknown Assignment"
+        )
+
+        assignment_url = assignment.get(
+            "url"
+        )
+
+        if not assignment_url:
+            print(
+                f"\n❌ No URL for: {title}"
+            )
+            continue
+
+        print("\n" + "-" * 70)
+        print(
+            f"📚 {course}"
+        )
+        print(
+            f"📝 {title}"
+        )
+        print("-" * 70)
+
+        try:
+
+            assignment_data = inspect_assignment_page(
+                page,
+                assignment_url
+            )
+
+            # -------------------------------------------------
+            # SAVE ASSIGNMENT TEXT
+            # -------------------------------------------------
+
+            safe_course = re.sub(
+                r'[\\/:*?"<>|]',
+                "_",
+                course
+            )
+
+            safe_title = re.sub(
+                r'[\\/:*?"<>|]',
+                "_",
+                title
+            )
+
+            output_dir = os.path.join(
+                DOWNLOAD_DIR,
+                safe_course,
+                safe_title
+            )
+
+            os.makedirs(
+                output_dir,
+                exist_ok=True
+            )
+
+            text_file = os.path.join(
+                output_dir,
+                "assignment.txt"
+            )
+
+            with open(
+                text_file,
+                "w",
+                encoding="utf-8"
+            ) as file:
+
+                file.write(
+                    assignment_data.get(
+                        "text",
+                        ""
+                    )
+                )
+
+            print(
+                f"\n💾 Assignment text saved:"
+            )
+            print(text_file)
+
+            # -------------------------------------------------
+            # DOWNLOAD ATTACHMENTS
+            # -------------------------------------------------
+
+            downloaded_files = (
+                download_assignment_files(
+                    assignment_data,
+                    output_dir
+                )
+            )
+
+            total_files += len(
+                downloaded_files
+            )
+
+        except Exception as e:
+
+            print(
+                f"\n❌ Failed to process "
+                f"{title}: {e}"
+            )
+
+    print("\n" + "=" * 70)
+    print("📊 DOWNLOAD COMPLETE")
+    print("=" * 70)
+
+    print(
+        f"Assignments processed: "
+        f"{len(pending_assignments)}"
+    )
+
+    print(
+        f"Files downloaded: "
+        f"{total_files}"
+    )
+
+    print("=" * 70)
     # ---------------------------------------------------------
     # SORT BY DUE DATE
     # ---------------------------------------------------------

@@ -19,6 +19,7 @@ def normalize_text(text):
 # Place it before extract_assignment_details()
 
 def inspect_assignment_page(page, assignment_url):
+
     print_separator()
 
     print("📄 OPENING INDIVIDUAL ASSIGNMENT")
@@ -46,43 +47,20 @@ def inspect_assignment_page(page, assignment_url):
     print_separator()
 
     try:
+
         body_text = page.locator(
             "body"
         ).inner_text()
 
     except Exception as e:
+
         print(
             f"❌ Could not extract page text: {e}"
         )
+
         body_text = ""
 
     print(body_text)
-
-    # --------------------------------------------------------
-    # SAVE PAGE TEXT
-    # --------------------------------------------------------
-
-    output_file = "assignment_21_content.txt"
-
-    try:
-        with open(
-            output_file,
-            "w",
-            encoding="utf-8"
-        ) as file:
-
-            file.write(body_text)
-
-        print_separator()
-
-        print("💾 Page text saved to:")
-        print(output_file)
-
-    except Exception as e:
-
-        print(
-            f"❌ Could not save page text: {e}"
-        )
 
     # --------------------------------------------------------
     # ATTACHMENTS
@@ -111,6 +89,7 @@ def inspect_assignment_page(page, assignment_url):
             )
 
         except Exception:
+
             text = ""
 
         try:
@@ -120,6 +99,7 @@ def inspect_assignment_page(page, assignment_url):
             )
 
         except Exception:
+
             href = None
 
         if not href:
@@ -146,6 +126,7 @@ def inspect_assignment_page(page, assignment_url):
             existing["url"] == absolute_url
             for existing in attachments
         ):
+
             attachments.append(
                 attachment
             )
