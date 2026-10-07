@@ -21,6 +21,7 @@ storage/aums_session.json
 # Downloaded assignment files
 assignment_files/*
 !assignment_files/.gitkeep
+assignment_21_content.txt
 
 # macOS
 .DS_Store
